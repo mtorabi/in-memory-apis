@@ -19,6 +19,8 @@ import com.reckless_bank.in_memory_apis.account.domain.model.Account;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Account Controller for managing bank accounts
@@ -54,8 +56,10 @@ public class AccountController {
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Account>> getAllAccounts() {
-        return ResponseEntity.ok(getAllAccountsUseCase.execute());
+    public ResponseEntity<List<Account>> getAllAccounts() {
+        Map<String, Account> accountsMap = getAllAccountsUseCase.execute();
+        List<Account> accountsList = new ArrayList<>(accountsMap.values());
+        return ResponseEntity.ok(accountsList);
     }
 
     @GetMapping("/{accountId}")
