@@ -10,6 +10,7 @@ A Spring Boot application implementing core banking operations with an in-memory
 - [Prerequisites](#prerequisites)
 - [Setup Instructions](#setup-instructions)
 - [Running the Application](#running-the-application)
+- [Docker Deployment](#docker-deployment)
 - [API Endpoints](#api-endpoints)
 - [Testing](#testing)
 - [Architecture](#architecture)
@@ -34,6 +35,8 @@ The Fast & Reckless Bank application provides core banking functionalities inclu
 - **Spring TX** - Transaction management
 - **Maven** - Build tool and dependency management
 - **JUnit 5** - Testing framework
+- **Docker** - Containerization platform
+- **Docker Compose** - Multi-container orchestration
 
 ## Project Structure
 
@@ -102,6 +105,8 @@ Before running this application, ensure you have the following installed:
 - **Maven 3.6+** (or use the included Maven wrapper)
 - **Git** (for version control)
 - **IDE** (IntelliJ IDEA, Eclipse, or VS Code recommended)
+- **Docker** (for containerized deployment - optional)
+- **Docker Compose** (for orchestrated deployment - optional)
 
 ### Verify Java Installation
 
@@ -189,6 +194,211 @@ Once running, verify the application is healthy:
 ```bash
 curl http://localhost:8080/actuator/health
 ```
+
+## Docker Deployment
+
+The application is fully containerized with Docker support for easy deployment across different environments.
+
+### Docker Prerequisites
+
+- **Docker** 20.10+ installed and running
+- **Docker Compose** 2.0+ (optional, for orchestrated deployment)
+
+### Docker Files Structure
+
+The project includes the following Docker-related files:
+
+```text
+├── Dockerfile                    # Multi-stage build configuration
+├── docker-compose.yml           # Orchestration configuration  
+├── .dockerignore                # Files excluded from build context
+├── docker-build.ps1             # Windows PowerShell build script
+├── docker-build.sh              # Unix/Linux build script
+└── src/main/resources/
+    └── application-docker.properties  # Docker-specific configuration
+```
+
+### Quick Start with Docker
+
+#### Option 1: Using Build Scripts (Recommended)
+
+**For Windows (PowerShell):**
+```powershell
+# Set execution policy if needed
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Build and run
+.\docker-build.ps1
+```
+
+**For Linux/macOS (Bash):**
+```bash
+# Make script executable
+chmod +x docker-build.sh
+
+# Build and run
+./docker-build.sh
+```
+
+#### Option 2: Using Docker Compose
+```bash
+# Build and start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+#### Option 3: Manual Docker Commands
+```bash
+# Build the image
+docker build -t reckless-bank/in-memory-apis:latest .
+
+# Run the container
+docker run -d \
+  --name reckless-bank-api \
+  -p 8080:8080 \
+  --restart unless-stopped \
+  reckless-bank/in-memory-apis:latest
+```
+
+### Docker Configuration Details
+
+#### Multi-Stage Dockerfile Features
+
+- **Build Stage**: Uses `eclipse-temurin:21-jdk-alpine` for compilation
+- **Runtime Stage**: Uses `eclipse-temurin:21-jre-alpine` for smaller image size
+- **Security**: Runs as non-root user (`appuser:appgroup`)
+- **Health Checks**: Built-in health monitoring using Actuator endpoints
+- **Optimizations**: Layered builds for better caching and faster rebuilds
+
+#### Docker Environment Configuration
+
+The application uses a Docker-specific profile (`application-docker.properties`) with:
+
+```properties
+# Enhanced Actuator endpoints for containerized monitoring
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+management.endpoint.health.show-details=always
+management.prometheus.metrics.export.enabled=true
+
+# Container-optimized logging
+logging.pattern.console=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+
+# Graceful shutdown for container environments
+server.shutdown=graceful
+spring.lifecycle.timeout-per-shutdown-phase=20s
+```
+
+### Docker Operations
+
+#### Container Management
+```bash
+# View running containers
+docker ps
+
+# View container logs
+docker logs -f reckless-bank-api
+
+# Stop container
+docker stop reckless-bank-api
+
+# Remove container
+docker rm reckless-bank-api
+
+# Remove image
+docker rmi reckless-bank/in-memory-apis:latest
+```
+
+#### Health Monitoring in Docker
+```bash
+# Check health status
+docker inspect --format='{{.State.Health.Status}}' reckless-bank-api
+
+# View health check logs
+docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' reckless-bank-api
+
+# Access health endpoint
+curl http://localhost:8080/actuator/health
+```
+
+### Docker Production Considerations
+
+#### Environment Variables
+```bash
+# Run with custom environment
+docker run -d \
+  --name reckless-bank-api \
+  -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=production \
+  -e JAVA_OPTS="-Xms512m -Xmx1024m" \
+  reckless-bank/in-memory-apis:latest
+```
+
+#### Volume Mounts for Logs
+```bash
+# Mount logs directory
+docker run -d \
+  --name reckless-bank-api \
+  -p 8080:8080 \
+  -v /host/logs:/app/logs \
+  reckless-bank/in-memory-apis:latest
+```
+
+#### Registry Deployment
+```bash
+# Tag for registry
+docker tag reckless-bank/in-memory-apis:latest your-registry.com/reckless-bank/in-memory-apis:1.0.0
+
+# Push to registry
+docker push your-registry.com/reckless-bank/in-memory-apis:1.0.0
+```
+
+### Docker Troubleshooting
+
+#### Common Docker Issues
+
+1. **Port already in use**:
+   ```bash
+   # Use different port mapping
+   docker run -d -p 8081:8080 reckless-bank/in-memory-apis:latest
+   ```
+
+2. **Container not starting**:
+   ```bash
+   # Check logs for errors
+   docker logs reckless-bank-api
+   
+   # Run interactively for debugging
+   docker run -it --rm reckless-bank/in-memory-apis:latest /bin/sh
+   ```
+
+3. **Build context too large**:
+   ```bash
+   # Clean Maven target directory first
+   .\mvnw clean
+   docker build -t reckless-bank/in-memory-apis:latest .
+   ```
+
+4. **Health check failing**:
+   ```bash
+   # Check if application is responding
+   docker exec reckless-bank-api curl -f http://localhost:8080/actuator/health
+   ```
+
+### Docker Best Practices Implemented
+
+- ✅ **Multi-stage builds** for smaller production images
+- ✅ **Non-root user** for security
+- ✅ **Health checks** for monitoring
+- ✅ **Graceful shutdown** handling
+- ✅ **Layered caching** for faster builds
+- ✅ **Minimal base images** (Alpine Linux)
+- ✅ **Build scripts** for different platforms
+- ✅ **Environment-specific configuration**
 
 ## API Endpoints
 
